@@ -1,0 +1,249 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import fetch_california_housing
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.metrics import r2_score, mean_squared_error
+from scipy.stats import t
+from scipy import stats
+
+# Завантажуємо датасет
+'''
+Attribute Information:
+    - MedInc        середній дохід району
+    - HouseAge      середній вік будинку районі
+    - AveRooms      середня кількість кімнат на домогосподарство
+    - AveBedrms     середня кількість спалень на домогосподарство
+    - Population    населення району
+    - AveOccup      середня кількість членів домогосподарства
+    - Latitude      розташування широта
+    - Longitude     розташування довгота
+'''
+housing = fetch_california_housing()
+data = pd.DataFrame(housing.data, columns=housing.feature_names)
+data['PRICE'] = housing.target
+
+print(data)
+
+# Перевіряємо наявність пустих рядків
+print(f"Пустих рядків: {data.isnull().sum().sum()}")
+
+# Видаляємо дублікати (якщо є)
+with_duplicates = len(data)
+data.drop_duplicates(inplace=True)
+print(f"Кількість рядків до і після видалення дублікатів: {with_duplicates} - {len(data)}")
+
+# Заповнюємо пропущені значення (якщо є)
+data = data.fillna(data.mean())
+
+# Приведення типів даних (якщо потрібно)
+data['PRICE'] = data['PRICE'].astype('float')
+
+# Перевіряємо типи даних стовпців
+print(data.dtypes)
+
+print(data)
+
+# Візуалізуємо залежності між показниками та ціною за допомогою діаграми розсіювання
+# Список показників для візуалізації
+features = ['MedInc', 'HouseAge', 'AveRooms', 'AveBedrms',	'Population',	'AveOccup',	'Latitude',	'Longitude']
+
+# Створюємо багатопанельну діаграму розсіювання
+fig, axes = plt.subplots(nrows=1, ncols=len(features), figsize=(16, 4))
+fig.suptitle('Залежність між показниками та ціною', fontsize=16)
+
+for ax, feature in zip(axes, features):
+    sns.scatterplot(data=data, x=feature, y='PRICE', ax=ax)
+    ax.set_title(feature)
+    ax.set_xlabel(feature)
+    ax.set_ylabel('Ціна')
+
+plt.tight_layout()
+plt.show()
+
+# Обчислюємо матрицю кореляції
+corr_matrix = data.corr()
+# Візуалізуємо матрицю кореляції як різнокольорову карту
+plt.figure(figsize=(9, 3))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm')
+plt.title('Матриця кореляції')
+plt.show()
+
+# Вибираємо змінні для побудови парної лінійної регресії
+X = data['MedInc'].values.reshape(-1, 1)
+y = data['PRICE'].values
+
+# Візуалізуємо залежність між X та y
+plt.scatter(X, y, alpha=0.3)
+plt.xlabel('Медіанний дохід (MedInc)')
+plt.ylabel('Медіанна вартість будинку (PRICE)')
+plt.title('Залежність між медіанним доходом та вартістю будинку')
+plt.show()
+
+# Розділяємо датасет на навчальний та тестовий набори
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Знаходимо оцінки коефіцієнтів методом найменших квадратів
+X_mean = X_train.mean()
+y_mean = y_train.mean()
+print(f"\nX_mean: {X_mean}, y_mean: {y_mean} ")
+b1 = np.sum((X_train - X_mean) * (y_train - y_mean)) / np.sum(pow(X_train - X_mean, 2))
+b0 = y_mean - b1 * X_mean
+print(f'Рівняння регресії: y = {b0} + {b1}*x')
+
+# Обчислення передбачених значень на навчальній вибірці
+y_train_pred = b0 + b1 * X_train
+
+# Візуалізуємо графік парної лінійної регресії
+plt.figure(figsize=(5, 3))
+plt.scatter(X_train, y_train, color='red')
+plt.plot(X_test, model.predict(X_test), color='blue', linewidth=3)
+plt.xlabel('Середній дохід по місцевості')
+plt.ylabel('Середня ціна')
+plt.title('Лінійна регресія: Середній дохід по місцевості vs Середня ціна')
+plt.show()
+
+# Обчислення коефіцієнта детермінації (R²) на тестовій вибірці
+ss_total = np.sum((y_train - y_mean)**2)
+ss_res = np.sum((y_train - y_train_pred)**2)
+r2 = 1 - (ss_res / ss_total)
+
+# Виведення коефіцієнта детермінації
+print(f'Коефіцієнт детермінації (R^2): {r2:.2f}')
+
+# Обчислення чисельника формули кореляції
+numerator = np.sum((X_train - X_mean) * (y_train - y_mean))
+# Обчислення знаменника формули кореляції
+denominator = np.sqrt(np.sum((X_train - X_mean)**2) * np.sum((y_train - y_mean)**2))
+# Обчислення коефіцієнта кореляції
+correlation_coefficient = numerator / denominator
+
+# Виведення коефіцієнта кореляції
+print(f'Коефіцієнт кореляції: {correlation_coefficient:.2f}')
+
+# Характеризуємо рівень адекватності моделі за значенням R^2
+if r2 < 0.3:
+    print("Модель має низький рівень адекватності за значенням R^2.")
+elif r2 < 0.7:
+    print("Модель має середній рівень адекватності за значенням R^2.")
+else:
+    print("Модель має високий рівень адекватності за значенням R^2.")
+
+# Обчислення залишків
+residuals = y_train - y_train_pred
+
+# Обчислення MSE
+n = len(y_train)
+k = 1  # Кількість предикторів
+MSE = np.sum(residuals**2) / (n - k - 1)
+
+# Обчислення стандартної помилки для коефіцієнта при MedInc
+SE_b1 = np.sqrt(MSE / np.sum((X_train - X_mean)**2))
+
+# Стандартна помилка для інтерсепта
+SE_b0 = np.sqrt(MSE * (1/n + X_mean**2 / np.sum((X_train - X_mean)**2)))
+
+# Обчислення t-статистики
+t_b0 = b0 / SE_b0
+t_b1 = b1 / SE_b1
+
+# Обчислення p-значень
+p_b0 = 2 * (1 - t.cdf(np.abs(t_b0), df=n - k - 1))
+p_b1 = 2 * (1 - t.cdf(np.abs(t_b1), df=n - k - 1))
+
+print(f't-статистика для інтерсепта (b0): {t_b0}')
+print(f't-статистика для коефіцієнта при MedInc (b1): {t_b1}')
+print(f'p-значення для інтерсепта (b0): {p_b0}')
+print(f'p-значення для коефіцієнта при MedInc (b1): {p_b1}')
+
+# Прогнозування значень на тестовій вибірці
+y_pred = model.predict(X_test)
+
+# Обчислення залишків
+residuals = y_train - model.predict(X_train)
+
+# Кількість спостережень та предикторів
+n = len(y_train)
+p = 1  # Кількість предикторів (MedInc)
+
+# Обчислення стандартної похибки
+mean_x = np.mean(X_train)
+SE_y = np.sqrt(np.sum(residuals**2) / (n - 2))
+SE_pred = SE_y * np.sqrt(1/n + (X_test - mean_x)**2 / np.sum((X_train - mean_x)**2))
+
+# Обчислення t-значення для довірчого інтервалу
+t_value = stats.t.ppf(0.975, df=n - p - 1)
+
+# Обчислення довірчого інтервалу
+CI_lower = y_pred - t_value * SE_pred.flatten()
+CI_upper = y_pred + t_value * SE_pred.flatten()
+
+# Виведення результатів
+print(f'Прогнозовані значення: {y_pred}')
+print(f'Довірчий інтервал нижня межа: {CI_lower}')
+print(f'Довірчий інтервал верхня межа: {CI_upper}')
+
+# Побудова графіку
+plt.figure(figsize=(10, 6))
+plt.scatter(X_test, y_test, color='blue', label='Фактичні дані')
+plt.plot(X_test, y_pred, color='green', label='Прогнозовані значення')
+plt.fill_between(X_test.squeeze(), CI_lower, CI_upper, color='red', alpha=0.2, label='Довірчий інтервал')
+plt.xlabel('MedInc')
+plt.ylabel('Target')
+plt.legend()
+plt.show()
+
+# Функція для оцінки моделі
+def evaluate_model(model, X_train, X_test, y_train, y_test):
+    model.fit(X_train, y_train)
+    y_train_pred = model.predict(X_train)
+    y_test_pred = model.predict(X_test)
+
+
+# Лінійна регресія
+linear_model = LinearRegression()
+evaluate_model(linear_model, X_train, X_test, y_train, y_test)
+
+# Поліноміальна регресія (2 ступінь)
+poly = PolynomialFeatures(degree=2)
+X_train_poly = poly.fit_transform(X_train)
+X_test_poly = poly.transform(X_test)
+poly_model = LinearRegression()
+evaluate_model(poly_model, X_train_poly, X_test_poly, y_train, y_test)
+
+# Ridge регресія
+ridge_model = Ridge(alpha=1.0)
+evaluate_model(ridge_model, X_train, X_test, y_train, y_test)
+
+# Lasso регресія
+lasso_model = Lasso(alpha=0.1)
+evaluate_model(lasso_model, X_train, X_test, y_train, y_test)
+
+# Порівняння моделей
+models = {
+    'Linear': LinearRegression(),
+    'Polynomial (2 degree)': LinearRegression(),
+    'Ridge': Ridge(alpha=1.0),
+    'Lasso': Lasso(alpha=0.1)
+}
+
+# Для поліноміальної регресії потрібно трансформувати X_train і X_test
+X_train_poly = poly.fit_transform(X_train)
+X_test_poly = poly.transform(X_test)
+
+results = []
+for name, model in models.items():
+    if name == 'Polynomial (2 degree)':
+        X_train_used, X_test_used = X_train_poly, X_test_poly
+    else:
+        X_train_used, X_test_used = X_train, X_test
+    
+    scores = cross_val_score(model, X_train_used, y_train, scoring='neg_mean_squared_error', cv=5)
+    results.append((name, -np.mean(scores)))
+
+# Вивід результатів
+for name, mse in results:
+    print(f"{name}: Cross-Validated MSE = {mse}")
